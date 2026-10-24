@@ -39,7 +39,7 @@ public class JsonPathTypeAdapter<T> {
     public final T read(InputStream is) {
         is = process(is);
 
-        String jsonContent = null;
+        Object jsonContent = null;
 
         String[] jsonPath = getJsonPath(getGenericType());
 
@@ -47,7 +47,7 @@ public class JsonPathTypeAdapter<T> {
             DocumentContext parser = mParser.parse(is);
             for (String path : jsonPath) {
                 try {
-                    jsonContent = parser.read(path).toString();
+                    jsonContent = parser.read(path);
                     break;
                 } catch (PathNotFoundException e) {
                     Log.e(TAG, e.getMessage());
@@ -78,7 +78,7 @@ public class JsonPathTypeAdapter<T> {
         return mType;
     }
 
-    private Object readType(Class<?> type, String jsonContent) {
+    private Object readType(Class<?> type, Object jsonContent) {
         if (type == null || jsonContent == null) {
             return null;
         }
@@ -90,7 +90,9 @@ public class JsonPathTypeAdapter<T> {
             Constructor<?> constructor = type.getConstructor();
             obj = constructor.newInstance();
 
-            DocumentContext parser = mParser.parse(jsonContent);
+            // Reuse nested JSON trees instead of serializing and reparsing every object.
+            DocumentContext parser = jsonContent instanceof String
+                    ? mParser.parse((String) jsonContent) : mParser.parse(jsonContent);
 
             List<Field> fields = ReflectionHelper.getAllFields(type);
 
@@ -127,7 +129,7 @@ public class JsonPathTypeAdapter<T> {
                 jsonVal = parser.read(path);
                 break;
             } catch (PathNotFoundException e) {
-                Log.d(TAG, type.getSimpleName() + ": Path not found: " + path);
+                // Missing optional fields are expected across YouTube clients.
             }
         }
 
@@ -137,7 +139,7 @@ public class JsonPathTypeAdapter<T> {
 
         try {
             if (JsonPathObj.class.isAssignableFrom(field.getType())) {
-                Object val = readType(field.getType(), jsonVal.toString());
+                Object val = readType(field.getType(), jsonVal);
                 field.set(obj, val);
             } else if (jsonVal instanceof JsonArray) {
                 List<Object> list = null;
@@ -154,7 +156,7 @@ public class JsonPathTypeAdapter<T> {
                     if (jsonObj instanceof JsonPrimitive) {
                         item = parsePrimitive((JsonPrimitive) jsonObj);
                     } else {
-                        item = readType(myType, jsonObj.toString());
+                        item = readType(myType, jsonObj);
                     }
 
                     if (item != null) {
@@ -172,7 +174,7 @@ public class JsonPathTypeAdapter<T> {
 
                 field.set(obj, val);
             } else if (jsonVal instanceof JsonObject) {
-                Object val = readType(field.getType(), jsonVal.toString());
+                Object val = readType(field.getType(), jsonVal);
                 field.set(obj, val);
             }
 

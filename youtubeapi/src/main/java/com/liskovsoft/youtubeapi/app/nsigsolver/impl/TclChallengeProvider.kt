@@ -9,6 +9,9 @@ import com.liskovsoft.youtubeapi.app.nsigsolver.common.CacheService
 import com.liskovsoft.youtubeapi.app.nsigsolver.common.CachedData
 import com.liskovsoft.youtubeapi.app.nsigsolver.common.loadScript
 import com.liskovsoft.youtubeapi.app.nsigsolver.common.withLock
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * Solves the n-parameter challenge for TCL-flavored players (tv-player-*-tcl.vflset), whose
@@ -32,17 +35,47 @@ internal object TclChallengeProvider {
     private val solverOutputType = object : TypeToken<SolverOutput>() {}.type
     private var v8Runtime: V8? = null
     private val v8Lock = Any()
+    // V8 must be created, used and released on the same thread.
+    private val worker = Executors.newSingleThreadScheduledExecutor { task ->
+        Thread(task, "TclChallengeSolver").apply { isDaemon = true }
+    }
+    private var idleCleanup: ScheduledFuture<*>? = null
+    private var cachedPlayerUrl: String? = null
+    private var cachedPlayerCode: String? = null
     private const val cacheSection = "tcl-challenge-solver"
 
     private data class SolverOutput(val type: String?, val results: Map<String, String>?, val error: String?, val preprocessed_player: String?)
 
     /**
      * @param playerUrl the TCL player's url (cache key)
-     * @param playerCode the TCL player's JS source
+     * @param playerCode lazily loads the TCL player source when no processed cache exists
      * @param nParams bare n-parameter values (as seen in a stream url's "n" query param)
      * @return map from each input nParam to its decoded value, or null for one that failed
      */
-    fun solveN(playerUrl: String, playerCode: String, nParams: List<String>): Map<String, String?> {
+    fun solveN(playerUrl: String, playerCode: () -> String?, nParams: List<String>): Map<String, String?> {
+        val task = worker.submit<Map<String, String?>> {
+            idleCleanup?.cancel(false)
+            try {
+                solveNOnWorker(playerUrl, playerCode, nParams)
+            } finally {
+                // Reuse the decoder across videos, but release it on idle TVs.
+                idleCleanup = worker.schedule({
+                    shutdownIfNeeded()
+                    cachedPlayerUrl = null
+                    cachedPlayerCode = null
+                }, 30, TimeUnit.SECONDS)
+            }
+        }
+        return try {
+            task.get()
+        } catch (e: InterruptedException) {
+            task.cancel(false)
+            Thread.currentThread().interrupt()
+            throw e
+        }
+    }
+
+    private fun solveNOnWorker(playerUrl: String, playerCode: () -> String?, nParams: List<String>): Map<String, String?> {
         if (nParams.isEmpty()) {
             return emptyMap()
         }
@@ -53,7 +86,13 @@ internal object TclChallengeProvider {
         val challengeByParam = nParams.distinct().associateWith { "https://www.youtube.com/videoplayback?n=$it" }
 
         val cacheKey = "player:$playerUrl"
-        val cachedPreprocessed = CacheService.load(cacheSection, cacheKey)?.code
+        val cachedPreprocessed = if (cachedPlayerUrl == playerUrl) cachedPlayerCode
+            else CacheService.load(cacheSection, cacheKey)?.code
+        if (cachedPlayerUrl != playerUrl) {
+            shutdownIfNeeded()
+        }
+        cachedPlayerUrl = playerUrl
+        cachedPlayerCode = cachedPreprocessed
 
         val request = if (cachedPreprocessed != null) {
             mapOf(
@@ -64,7 +103,7 @@ internal object TclChallengeProvider {
         } else {
             mapOf(
                 "type" to "player",
-                "player" to playerCode,
+                "player" to (playerCode() ?: return nParams.associateWith { null }),
                 "challenges" to challengeByParam.values.toList(),
                 "output_preprocessed" to true
             )
@@ -74,9 +113,8 @@ internal object TclChallengeProvider {
 
         val stdout = try {
             synchronized(v8Lock) {
-                initRuntime()
+                initRuntime(cachedPreprocessed == null)
                 val result = runV8(stdin)
-                shutdownIfNeeded()
                 result
             }
         } catch (e: Exception) {
@@ -96,11 +134,16 @@ internal object TclChallengeProvider {
             if (cachedPreprocessed != null) {
                 // cached preprocessed script may be stale (e.g. player build rotated)
                 CacheService.clear(cacheSection)
+                cachedPlayerCode = null
+                shutdownIfNeeded()
             }
             return nParams.associateWith { null }
         }
 
-        output.preprocessed_player?.let { CacheService.store(cacheSection, cacheKey, CachedData(it)) }
+        output.preprocessed_player?.let {
+            CacheService.store(cacheSection, cacheKey, CachedData(it))
+            cachedPlayerCode = it
+        }
 
         val results = output.results ?: emptyMap()
 
@@ -114,17 +157,21 @@ internal object TclChallengeProvider {
         }
     }
 
-    private fun initRuntime() {
+    private fun initRuntime(needsParser: Boolean) {
         if (v8Runtime != null) {
             return
         }
         v8Runtime = V8.createV8Runtime()
-        runV8(constructCommonStdin())
+        runV8(constructCommonStdin(needsParser))
     }
 
-    private fun constructCommonStdin(): String {
+    private fun constructCommonStdin(needsParser: Boolean): String {
+        // Cached challenges already contain executable code; AST tools are only for a new player.
+        val libraries = if (needsParser) libFilenames else listOf(libFilenames.first(), libFilenames.last())
+        val parserDefaults = if (needsParser) "" else "var meriyah = null, astring = null;"
         return """
-        ${loadScript(libFilenames, "Failed to read TCL challenge solver script")}
+        ${parserDefaults}
+        ${loadScript(libraries, "Failed to read TCL challenge solver script")}
         "";
         """
     }

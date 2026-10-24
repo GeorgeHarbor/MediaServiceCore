@@ -743,12 +743,18 @@ var tclSolver = (function (meriyah, astring) {
   //       | { type: "preprocessed", preprocessed_player: "<cached script from a prior result>", challenges: [...] }
   // output = { type: "result", results: { "<challenge>": "<decoded n>" }, preprocessed_player?: "..." }
   //        | { type: "error", error: "..." }
+  let cachedPlayer;
+  let cachedNFunction;
   function main(input) {
     try {
       const preprocessedPlayer = input.type === "preprocessed"
         ? input.preprocessed_player
         : preprocessPlayer(input.player);
-      const nFunction = new Function(preprocessedPlayer)();
+      if (cachedPlayer !== preprocessedPlayer) {
+        cachedNFunction = new Function(preprocessedPlayer)();
+        cachedPlayer = preprocessedPlayer;
+      }
+      const nFunction = cachedNFunction;
       const results = {};
       for (const challenge of input.challenges) {
         results[challenge] = nFunction(challenge);

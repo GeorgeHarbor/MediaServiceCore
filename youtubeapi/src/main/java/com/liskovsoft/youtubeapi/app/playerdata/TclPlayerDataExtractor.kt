@@ -107,7 +107,7 @@ internal class TclPlayerDataExtractor(override val playerUrl: String): PlayerDat
 
         val validNParams = nParams?.takeIf { nFuncCode }?.filterNotNull()?.takeIf { it.isNotEmpty() }?.distinct()
 
-        val nResults = validNParams?.let { params -> playerCode?.let { TclChallengeProvider.solveN(fixedPlayerUrl, it, params) } }
+        val nResults = validNParams?.let { params -> TclChallengeProvider.solveN(fixedPlayerUrl, { playerCode }, params) }
         val nProcessed = nResults?.let { results -> nParams?.map { results[it] } }
         // TCL works only in TV version, so sig isn't necessary in this client
         return Pair(nProcessed, null)
@@ -160,7 +160,7 @@ internal class TclPlayerDataExtractor(override val playerUrl: String): PlayerDat
         try {
             val nParam = "5cNpZqIJ7ixNqU68Y7S"
             val code = playerCode ?: return
-            val result = TclChallengeProvider.solveN(fixedPlayerUrl, code, listOf(nParam))
+            val result = TclChallengeProvider.solveN(fixedPlayerUrl, { code }, listOf(nParam))
             if (result[nParam]?.let { it != nParam } == true) {
                 nFuncCode = true
             }
