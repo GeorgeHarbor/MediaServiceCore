@@ -38,6 +38,7 @@ open class BaseMediaItem : MediaItem {
 
     protected open val reloadPageKeyItem: String? = null
     protected open val badgeTextItem: String? = null
+    protected open val qualityBadgesItem: List<String>? = null
     protected open val typeItem: Int = MediaItem.TYPE_VIDEO
     protected open val videoIdItem: String? = null
     protected open val titleItem: String? = null
@@ -152,6 +153,10 @@ open class BaseMediaItem : MediaItem {
 
     override fun getBadgeText(): String? {
         return lengthText ?: badgeTextItem
+    }
+
+    override fun getQualityBadges(): List<String>? {
+        return qualityBadgesItem
     }
 
     override fun getPlaylistId(): String? {

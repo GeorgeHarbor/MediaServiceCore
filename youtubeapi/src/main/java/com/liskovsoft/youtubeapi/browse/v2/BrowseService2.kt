@@ -543,6 +543,9 @@ internal open class BrowseService2 {
             if (result.isEmpty()) // playlist
                 addOrMerge(result, BrowseMediaGroupTV(it, gridOptions))
 
+            // Last, so the first group still defines the type of the continuation
+            it.getChannelHeader()?.let { header -> result.add(ChannelHeaderMediaGroup(header)) }
+
             Pair(result, it.getContinuationToken())
         }
     }

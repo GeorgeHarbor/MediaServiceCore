@@ -82,13 +82,36 @@ internal data class RichSectionRenderer(
 
 internal data class TvSurfaceContentRenderer(
     val content: Content?,
-    val continuation: ContinuationItem?
+    val continuation: ContinuationItem?,
+    val header: Header?
 ) {
+    data class Header(
+        val channelHeaderRenderer: ChannelHeaderRenderer?
+    )
+
     data class Content(
         val sectionListRenderer: ShelfListWrapper?,
         val gridRenderer: GridRenderer?, // TV
         val twoColumnRenderer: TwoColumnRenderer? // TV
     )
+}
+
+// Channel page header of the TV client: banner, avatar, name, description, Play mix and Subscribe buttons
+internal data class ChannelHeaderRenderer(
+    val backgroundImage: ThumbnailItem?,
+    val avatar: ThumbnailItem?,
+    val title: TextItem?,
+    val subtitle: TileMetadataRenderer.Line?,
+    val buttons: List<ButtonContentWrapper?>?,
+    val selectableDescription: SelectableDescription?
+) {
+    data class SelectableDescription(
+        val selectableTextRenderer: SelectableTextRenderer?
+    ) {
+        data class SelectableTextRenderer(
+            val compactDescription: TextItem?
+        )
+    }
 }
 
 internal data class TwoColumnRenderer(

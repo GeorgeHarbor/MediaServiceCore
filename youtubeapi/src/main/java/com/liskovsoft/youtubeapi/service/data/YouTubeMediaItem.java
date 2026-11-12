@@ -19,6 +19,8 @@ import com.liskovsoft.youtubeapi.next.v1.models.NextVideo;
 import com.liskovsoft.youtubeapi.common.models.V2.TileItem;
 import com.liskovsoft.googlecommon.common.helpers.YouTubeHelper;
 
+import java.util.List;
+
 public class YouTubeMediaItem implements MediaItem {
     //private static int sId;
     private int mId;
@@ -500,6 +502,11 @@ public class YouTubeMediaItem implements MediaItem {
     @Override
     public String getBadgeText() {
         return mBadgeText;
+    }
+
+    @Override
+    public List<String> getQualityBadges() {
+        return null;
     }
 
     public void setBadgeText(String badgeText) {

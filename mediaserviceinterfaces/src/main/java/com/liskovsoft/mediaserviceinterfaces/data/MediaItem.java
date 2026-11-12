@@ -2,6 +2,8 @@ package com.liskovsoft.mediaserviceinterfaces.data;
 
 import android.media.Rating;
 
+import java.util.List;
+
 public interface MediaItem {
     int TYPE_UNDEFINED = -1;
     int TYPE_VIDEO = 0;
@@ -50,6 +52,10 @@ public interface MediaItem {
      */
     long getDurationMs();
     String getBadgeText();
+    /**
+     * Badges before the view count, e.g. <b>4K</b>, <b>CC</b>
+     */
+    List<String> getQualityBadges();
     String getProductionDate();
     long getPublishedDate();
     String getCardImageUrl();

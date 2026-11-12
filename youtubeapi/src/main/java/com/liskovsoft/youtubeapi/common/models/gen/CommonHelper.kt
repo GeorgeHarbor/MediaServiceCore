@@ -197,6 +197,10 @@ internal fun TileItem.getSubTitle() = metadata?.tileMetadataRenderer?.lines
 internal fun TileItem.getBadgeText() = header?.tileHeaderRenderer?.thumbnailOverlays
     ?.firstNotNullOfOrNull { it?.thumbnailOverlayTimeStatusRenderer?.text?.getText() }
     ?: header?.trackTileHeaderRenderer?.duration?.getText()
+internal fun TileItem.getQualityBadges() = metadata?.tileMetadataRenderer?.lines
+    ?.flatMap { it?.lineRenderer?.items ?: emptyList() }
+    ?.mapNotNull { it?.lineItemRenderer?.badge?.metadataBadgeRenderer?.takeIf { badge -> badge.style == STATUS_STYLE_QUALITY }?.label }
+    ?.takeIf { it.isNotEmpty() }
 internal fun TileItem.getVideoId() = onSelectCommand?.getVideoId()
 internal fun TileItem.getPlaylistId() = onSelectCommand?.getPlaylistId() ?: getMenu()?.getPlaylistId()
 internal fun TileItem.getPlaylistIndex() = 0
@@ -336,6 +340,7 @@ internal fun ItemWrapper.getStartTimeSeconds() = getVideoItem()?.getStartTimeSec
 internal fun ItemWrapper.getUserName() = getVideoItem()?.getUserName() ?: getMusicItem()?.getUserName() ?: getTileItem()?.getUserName()
     ?: getRadioItem()?.getUserName()
 internal fun ItemWrapper.getPublishedTime() = getVideoItem()?.getPublishedTimeText() ?: getMusicItem()?.getViewsAndPublished() ?: getTileItem()?.getPublishedTime()
+internal fun ItemWrapper.getQualityBadges() = getTileItem()?.getQualityBadges()
 internal fun ItemWrapper.getViewCountText() = getVideoItem()?.getViewCount() ?: getMusicItem()?.getViewsCountText() ?: getTileItem()?.getViewCountText()
 internal fun ItemWrapper.getUpcomingEventText() = getVideoItem()?.getUpcomingEventText() ?: getMusicItem()?.getUpcomingEventText()
     ?: getTileItem()?.getUpcomingEventText()
